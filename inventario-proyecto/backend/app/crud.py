@@ -41,3 +41,33 @@ def create_product(db: Session, product_in: schemas.ProductCreate) -> models.Pro
 
 def get_products(db: Session):
     return db.query(models.Product).all()
+
+def update_product(db: Session, product_id: int, product_in: schemas.ProductCreate) -> models.Product:
+    db_product = db.query(models.Product).filter(models.Product.id == product_id).first()
+    if not db_product:
+        raise ValueError("Product not found")
+    
+    # Validar categoría
+    category = get_category(db, product_in.category_id)
+    if not category:
+        raise ValueError("Category not found")
+    
+    db_product.name = product_in.name
+    db_product.description = product_in.description
+    db_product.price = product_in.price
+    db_product.stock = product_in.stock
+    db_product.category_id = product_in.category_id
+    
+    db.commit()
+    db.refresh(db_product)
+    return db_product
+
+
+def delete_product(db: Session, product_id: int) -> bool:
+    db_product = db.query(models.Product).filter(models.Product.id == product_id).first()
+    if not db_product:
+        raise ValueError("Product not found")
+    
+    db.delete(db_product)
+    db.commit()
+    return True
