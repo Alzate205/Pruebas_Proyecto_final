@@ -30,6 +30,12 @@ def kill_process_on_port(port):
 
 @pytest.fixture(scope="module")
 def backend_server():
+    # Si estamos en CI, asumir que el servidor ya está corriendo
+    if os.getenv('CI'):
+        print("Running in CI - using existing backend server")
+        yield
+        return
+
     # Matar procesos previos en el puerto 8000
     kill_process_on_port(8000)
     time.sleep(1)
@@ -66,14 +72,20 @@ def backend_server():
 
 @pytest.fixture(scope="module")
 def frontend_server():
+    # Si estamos en CI, asumir que el servidor ya está corriendo
+    if os.getenv('CI'):
+        print("Running in CI - using existing frontend server")
+        yield
+        return
+
     # Matar procesos previos en el puerto 3000
     kill_process_on_port(3000)
     time.sleep(1)
-    
+
     # Obtener ruta absoluta al frontend
     current_dir = Path(__file__).resolve().parent
     frontend_path = current_dir.parent.parent.parent.parent / "frontend"
-    
+
     # Iniciar servidor frontend
     process = subprocess.Popen(
         ["python", "-m", "http.server", "3000"],
@@ -83,7 +95,7 @@ def frontend_server():
     )
     time.sleep(2)
     yield
-    
+
     # Terminar proceso
     process.terminate()
     try:
@@ -95,6 +107,14 @@ def frontend_server():
 @pytest.fixture(scope="function")
 def clean_database():
     """Limpia la base de datos antes de cada test"""
+    # En CI, simplemente esperar y no intentar eliminar la base de datos
+    # El servidor backend maneja su propia base de datos
+    if os.getenv('CI'):
+        print("Running in CI - skipping database cleanup")
+        time.sleep(1)
+        yield
+        return
+
     # Esperar un momento antes de limpiar para asegurar que conexiones previas se cierren
     time.sleep(0.5)
 
