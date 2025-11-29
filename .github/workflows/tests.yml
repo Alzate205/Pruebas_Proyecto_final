@@ -37,59 +37,74 @@ jobs:
       run: |
         python -m pytest app/tests/integration/ -v --tb=short
 
-  # Job para tests E2E (opcional - requiere servidores corriendo)
-  # Los tests E2E están deshabilitados en CI porque requieren:
-  # - Backend corriendo en puerto 8000
-  # - Frontend corriendo en puerto 3000
-  # Se deben ejecutar localmente antes de hacer push
-  #
-  # e2e-tests:
-  #   runs-on: ubuntu-latest
-  #   if: false  # Deshabilitado por ahora
-  #
-  #   steps:
-  #   - name: Checkout code
-  #     uses: actions/checkout@v4
-  #
-  #   - name: Set up Python
-  #     uses: actions/setup-python@v5
-  #     with:
-  #       python-version: '3.11'
-  #       cache: 'pip'
-  #
-  #   - name: Install dependencies
-  #     run: |
-  #       python -m pip install --upgrade pip
-  #       pip install -r inventario-proyecto/backend/requirements.txt
-  #
-  #   - name: Install Playwright browsers
-  #     run: |
-  #       playwright install --with-deps chromium
-  #
-  #   - name: Start backend server
-  #     working-directory: inventario-proyecto/backend
-  #     run: |
-  #       python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 &
-  #       sleep 5
-  #
-  #   - name: Start frontend server
-  #     working-directory: inventario-proyecto/frontend
-  #     run: |
-  #       python -m http.server 3000 &
-  #       sleep 2
-  #
-  #   - name: Run E2E tests
-  #     working-directory: inventario-proyecto/backend
-  #     run: |
-  #       python -m pytest app/tests/e2e/ -v --tb=short
-  #     env:
-  #       CI: true
-  #
-  #   - name: Upload test artifacts on failure
-  #     if: failure()
-  #     uses: actions/upload-artifact@v4
-  #     with:
-  #       name: test-results
-  #       path: |
-  #         inventario-proyecto/backend/inventory.db
-  #       retention-days: 7
+  # Job para tests E2E
+  e2e-tests:
+    runs-on: ubuntu-latest
+    needs: unit-and-integration-tests  # Solo ejecuta si los otros tests pasan
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r inventario-proyecto/backend/requirements.txt
+
+    - name: Install Playwright browsers
+      run: |
+        playwright install --with-deps chromium
+
+    - name: Start backend server
+      working-directory: inventario-proyecto/backend
+      run: |
+        python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+        echo $! > backend.pid
+        # Esperar a que el backend esté listo
+        for i in {1..30}; do
+          if curl -s http://localhost:8000/docs > /dev/null; then
+            echo "Backend is ready!"
+            break
+          fi
+          echo "Waiting for backend... ($i/30)"
+          sleep 1
+        done
+
+    - name: Start frontend server
+      working-directory: inventario-proyecto/frontend
+      run: |
+        python -m http.server 3000 &
+        echo $! > frontend.pid
+        sleep 3
+        # Verificar que el frontend está corriendo
+        curl -s http://localhost:3000 || echo "Frontend may not be ready"
+
+    - name: Run E2E tests
+      working-directory: inventario-proyecto/backend
+      run: |
+        python -m pytest app/tests/e2e/ -v --tb=short
+      env:
+        CI: true
+
+    - name: Stop servers
+      if: always()
+      working-directory: inventario-proyecto/backend
+      run: |
+        if [ -f backend.pid ]; then kill $(cat backend.pid) || true; fi
+        if [ -f ../frontend/frontend.pid ]; then kill $(cat ../frontend/frontend.pid) || true; fi
+
+    - name: Upload screenshots on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: playwright-screenshots
+        path: |
+          inventario-proyecto/backend/test-results/
+          inventario-proyecto/backend/inventory.db
+        retention-days: 7
