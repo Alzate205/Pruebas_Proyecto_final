@@ -4,6 +4,7 @@ import subprocess
 import time
 import os
 import signal
+from pathlib import Path
 
 
 @pytest.fixture(scope="module")
@@ -18,22 +19,26 @@ def backend_server():
     )
     time.sleep(3)
     yield
-    os.kill(process.pid, signal.SIGTERM)
+    process.terminate()
     process.wait()
 
 
 @pytest.fixture(scope="module")
 def frontend_server():
+    # Obtener ruta absoluta al frontend
+    current_dir = Path(__file__).resolve().parent
+    frontend_path = current_dir.parent.parent.parent.parent / "frontend"
+    
     # Iniciar servidor frontend
     process = subprocess.Popen(
         ["python", "-m", "http.server", "3000"],
-        cwd="../../frontend",
+        cwd=str(frontend_path),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE
     )
     time.sleep(2)
     yield
-    os.kill(process.pid, signal.SIGTERM)
+    process.terminate()
     process.wait()
 
 
