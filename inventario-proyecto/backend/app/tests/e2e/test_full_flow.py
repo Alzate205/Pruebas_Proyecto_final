@@ -118,7 +118,6 @@ def clean_database():
 
     yield
 
-    # No limpiar después del test para permitir debug si es necesario
 
 
 def test_complete_flow(page: Page, backend_server, frontend_server, clean_database):

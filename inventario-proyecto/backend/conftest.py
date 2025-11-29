@@ -5,11 +5,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.main import app
 from app.database import Base, get_db
-from app import models  # noqa: F401 - Import models to register them with Base.metadata
+from app import models
 
 
 # Database setup for integration tests
-# Use file::memory:?cache=shared to ensure all connections share the same in-memory database
 engine = create_engine(
     "sqlite:///file:memdb1?mode=memory&cache=shared&uri=true",
     connect_args={"check_same_thread": False},
